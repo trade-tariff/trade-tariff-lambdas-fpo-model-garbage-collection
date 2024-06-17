@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -25,7 +24,6 @@ const (
 	bucket    = "trade-tariff-models-382373577178"
 	repoUrl   = "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search"
 	clonePath = "/tmp/trade-tariff-lambdas-fpo-search"
-	dryRun    = true
 )
 
 type Model struct {
@@ -53,7 +51,7 @@ func execute() {
 	relevantCommits := fetchRemoteCommits(*repo, relevantBranches)
 	relevantModels := fetchS3ModelVersions(client, relevantCommits)
 
-	if dryRun {
+	if dryRun() {
 		prettyPrint(relevantModels)
 	} else {
 		deleteModelVersions(client, relevantModels)
@@ -166,8 +164,7 @@ func fetchRemoteCommits(r git.Repository, branch_refs []*plumbing.Reference) []*
 		checkIfError(err)
 
 		if len(mergeBase) == 0 {
-			fmt.Println("No merge base found for", targetBranch.Name().Short())
-			continue
+			logger.Log.Fatal("No merge base found", logger.String("targetBranch", targetBranch.Name().Short()))
 		}
 
 		commitIter, err := r.Log(&git.LogOptions{
@@ -250,16 +247,30 @@ func checkIfError(err error) {
 	}
 
 	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
+		logger.Log.Fatal(
+			"Error",
+			logger.String("error", err.Error()),
+		)
 	}
 }
 
 func prettyPrint(v interface{}) {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		fmt.Println("Error:", err)
+		logger.Log.Fatal("Failed to marshal JSON", logger.String("error", err.Error()))
 		return
 	}
-	fmt.Println(string(b))
+	logger.Log.Info(string(b))
+}
+
+func dryRun() bool {
+	var dryRun bool
+
+	if len(os.Getenv("DRY_RUN")) == 0 {
+		dryRun = true
+	} else {
+		dryRun = os.Getenv("DRY_RUN") == "true"
+	}
+
+	return dryRun
 }

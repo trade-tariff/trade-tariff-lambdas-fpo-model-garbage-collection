@@ -7,13 +7,13 @@ clean:
 	rm -rf bootstrap
 
 deploy-development: clean build
-	STAGE=development serverless deploy --verbose
+	STAGE=development DRY_RUN=true serverless deploy --verbose
 
 deploy-staging: clean build
-	STAGE=staging serverless deploy --verbose
+	STAGE=staging DRY_RUN=true serverless deploy --verbose
 
 deploy-production: clean build
-	STAGE=production serverless deploy --verbose
+	STAGE=production DRY_RUN=false serverless deploy --verbose
 
 test: clean build
 	cd collector && go test ./...

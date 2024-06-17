@@ -9,22 +9,16 @@ provider:
   deploymentBucket:
     name: ${env:DEPLOYMENT_BUCKET}
   environment:
-    FROM_EMAIL: ${env:FROM_EMAIL}
-    PERSISTENCE_BUCKET: ${env:PERSISTENCE_BUCKET}
-    TO_EMAILS: ${env:TO_EMAILS}
+    DRY_RUN: ${env:DRY_RUN}
   iamRoleStatements:
     - Effect: "Allow"
       Action:
         - s3:ListBucket
         - s3:GetObject
+        - s3:DeleteObject
       Resource:
-        - "arn:aws:s3:::${env:PERSISTENCE_BUCKET}"
-        - "arn:aws:s3:::${env:PERSISTENCE_BUCKET}/*"
-    - Effect: "Allow"
-      Action:
-        - ses:SendEmail
-        - ses:SendRawEmail
-      Resource: "*"
+        - "arn:aws:s3:::${env:MODEL_BUCKET}"
+        - "arn:aws:s3:::${env:MODEL_BUCKET}/*"
 
     - Effect: "Allow"
       Action:
