@@ -1,0 +1,44 @@
+frameworkVersion: "3"
+service: fpo-model-garbage-collection
+
+provider:
+  name: aws
+  region: eu-west-2
+  runtime: provided.al2023
+  stage: ${env:STAGE}
+  deploymentBucket:
+    name: ${env:DEPLOYMENT_BUCKET}
+  environment:
+    FROM_EMAIL: ${env:FROM_EMAIL}
+    PERSISTENCE_BUCKET: ${env:PERSISTENCE_BUCKET}
+    TO_EMAILS: ${env:TO_EMAILS}
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - s3:ListBucket
+        - s3:GetObject
+      Resource:
+        - "arn:aws:s3:::${env:PERSISTENCE_BUCKET}"
+        - "arn:aws:s3:::${env:PERSISTENCE_BUCKET}/*"
+    - Effect: "Allow"
+      Action:
+        - ses:SendEmail
+        - ses:SendRawEmail
+      Resource: "*"
+
+    - Effect: "Allow"
+      Action:
+        - kms:GenerateDataKey
+        - kms:Decrypt
+      Resource:
+        - "arn:aws:kms:${self:provider.region}:${aws:accountId}:key/*"
+
+package:
+  patterns:
+    - bootstrap
+
+functions:
+  notifier:
+    handler: bootstrap
+    events:
+      - schedule: cron(0 0 * * *) # Run every day at midnight

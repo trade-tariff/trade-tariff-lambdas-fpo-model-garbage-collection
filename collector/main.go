@@ -7,12 +7,15 @@ import (
 	"regexp"
 	"strings"
 
-	git "github.com/go-git/go-git/v5"
+	"github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection/logger"
+
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -34,6 +37,16 @@ type Model struct {
 }
 
 func main() {
+	if os.Getenv("AWS_LAMBDA_FUNCTION_VERSION") != "" {
+		logger.Log.Info("Running in AWS Lambda environment")
+		lambda.Start(execute)
+	} else {
+		logger.Log.Info("Running in local environment")
+		execute()
+	}
+}
+
+func execute() {
 	client := s3.New(initializeAWSSession())
 	repo := fetchRepo()
 	relevantBranches := fetchRemoteBranches(*repo)
@@ -115,8 +128,8 @@ func fetchS3ModelVersions(client *s3.S3, outstandingCommits []*object.Commit) ma
 
 	for _, commit := range outstandingCommits {
 		for key, model := range models {
-			branch_commit := commit.Hash.String()[0:7]
-			if branch_commit == model.ShortCommit {
+			short_commit_sha := commit.Hash.String()[0:7]
+			if short_commit_sha == model.ShortCommit {
 				model.UnderActiveDevelopment = true
 				models[key] = model
 			}
