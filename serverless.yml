@@ -32,7 +32,7 @@ package:
     - bootstrap
 
 functions:
-  notifier:
+  collector:
     handler: bootstrap
     events:
       - schedule: cron(0 12 * * ? *) # Run every day at 12 PM
