@@ -4,7 +4,7 @@ build:
 	cd collector && env GOARCH=amd64 GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -o ../bootstrap
 
 clean:
-	rm -rf bootstrap
+	rm -rf bootstrap && cd collector && go mod tidy
 
 deploy-development: clean build
 	STAGE=development DRY_RUN=true serverless deploy --verbose

@@ -3,12 +3,13 @@ let
 in
 pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
+    circleci-cli
+    delve
     go
     go-outline
-    gopls
-    gopkgs
     go-tools
-    delve
+    gopkgs
+    gopls
   ];
 
   hardeningDisable = ["all"];

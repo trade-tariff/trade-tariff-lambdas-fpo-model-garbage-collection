@@ -22,7 +22,7 @@ orbs:
 jobs:
   lint:
     docker:
-      - image: cimg/go:1.21.0
+      - image: cimg/go:1.23.0
     steps:
       - checkout
       - run:
@@ -32,7 +32,7 @@ jobs:
       - run: make lint
   test:
     docker:
-      - image: cimg/go:1.21.0
+      - image: cimg/go:1.23.0
     steps:
       - checkout
       - run: make test
@@ -41,7 +41,7 @@ jobs:
       stage:
         type: string
     docker:
-      - image: cimg/go:1.21.0
+      - image: cimg/go:1.23.0
     steps:
       - checkout
       - serverless-framework/setup
