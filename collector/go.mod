@@ -1,7 +1,6 @@
 module github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection
 
-go 1.21.9
-toolchain go1.24.1
+go 1.23.0
 
 require (
 	github.com/aws/aws-lambda-go v1.47.0
