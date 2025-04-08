@@ -21,6 +21,7 @@
           buildInputs = with pkgs; [
             circleci-cli
             go
+            golangci-lint
             gopls
             lint
             serverless

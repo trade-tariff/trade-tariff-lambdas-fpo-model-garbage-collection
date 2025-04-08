@@ -25,10 +25,7 @@ jobs:
       - image: cimg/go:1.23.0
     steps:
       - checkout
-      - run:
-          name: "Install linter"
-          command: |
-            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b $(go env GOPATH)/bin v1.54.2
+      - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - run: make lint
   test:
     docker:
