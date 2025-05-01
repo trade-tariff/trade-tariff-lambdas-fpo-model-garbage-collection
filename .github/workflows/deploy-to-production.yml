@@ -1,0 +1,38 @@
+name: Deploy to Production
+
+on:
+  workflow_run:
+    workflows: ["Deploy to Staging"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+      id-token: write
+      contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  STAGE: production
+  IAM_ROLE_ARN:  arn:aws:iam::382373577178:role/GithubActions-Serverless-Lambda-Role
+  DEPLOYMENT_BUCKET: trade-tariff-lambda-deployment-382373577178
+  MODEL_BUCKET: trade-tariff-models-382373577178
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: npm install -g serverless@^3
+      - run: make deploy-${{ env.STAGE }}

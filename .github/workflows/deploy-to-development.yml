@@ -1,0 +1,63 @@
+name: Lint, Test and Deploy to Development
+
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  STAGE: development
+  IAM_ROLE_ARN: arn:aws:iam::844815912454:role/GithubActions-Serverless-Lambda-Role
+  DEPLOYMENT_BUCKET: trade-tariff-lambda-deployment-844815912454
+  MODEL_BUCKET: trade-tariff-models-382373577178
+
+jobs:
+    lint:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: actions/setup-go@v5
+          with:
+            go-version: '1.23'
+
+        - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        - run: make lint
+
+    test:
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: actions/setup-go@v5
+          with:
+            go-version: '1.23'
+
+        - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        - run: make test
+
+    deploy:
+      needs: [lint, test]
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: actions/setup-node@v4
+          with:
+            node-version: 'lts/*'
+
+        - uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: ${{ env.IAM_ROLE_ARN }}
+            aws-region: ${{ env.AWS_REGION }}
+
+        - run: npm install -g serverless@^3
+        - run: make deploy-${{ env.STAGE }}
