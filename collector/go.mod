@@ -3,7 +3,7 @@ module github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection
 go 1.24.0
 
 require (
-	github.com/aws/aws-lambda-go v1.47.0
+	github.com/aws/aws-lambda-go v1.54.0
 	github.com/aws/aws-sdk-go v1.54.2
 	github.com/go-git/go-git/v5 v5.18.0
 	go.uber.org/zap v1.27.0
