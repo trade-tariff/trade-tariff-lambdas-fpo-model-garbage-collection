@@ -18,3 +18,7 @@
 *.out
 
 bootstrap
+
+.direnv
+.envrc
+/.pre-commit-config-nix.yaml
