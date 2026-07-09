@@ -15,9 +15,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/aws"           //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
+	"github.com/aws/aws-sdk-go/aws/session"  //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
+	"github.com/aws/aws-sdk-go/service/s3"   //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
 )
 
 const (
