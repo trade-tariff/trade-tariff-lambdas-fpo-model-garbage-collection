@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/aws/aws-lambda-go v1.54.0
-	github.com/aws/aws-sdk-go v1.54.2
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/go-git/go-git/v5 v5.18.0
 	go.uber.org/zap v1.28.0
 )
