@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -15,9 +17,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"           //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
-	"github.com/aws/aws-sdk-go/aws/session"  //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
-	"github.com/aws/aws-sdk-go/service/s3"   //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
+	"github.com/aws/aws-sdk-go/aws"         //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
+	"github.com/aws/aws-sdk-go/aws/session" //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
+	"github.com/aws/aws-sdk-go/service/s3"  //nolint:staticcheck // aws-sdk-go v1 still in use until v2 migration
 )
 
 const (
@@ -25,6 +27,13 @@ const (
 	repoUrl   = "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search"
 	clonePath = "/tmp/trade-tariff-lambdas-fpo-search"
 )
+
+// objectLister is the slice of the S3 client this collector needs. It exists so
+// the listing logic can be exercised against a faked, multi-page response: the
+// bug this interface was introduced for only shows up past the first page.
+type objectLister interface {
+	ListObjectsV2Pages(input *s3.ListObjectsV2Input, fn func(*s3.ListObjectsV2Output, bool) bool) error
+}
 
 type Model struct {
 	Version                string
@@ -45,13 +54,21 @@ func main() {
 }
 
 func execute() {
+	// Resolved before any work so a misconfigured deployment fails immediately
+	// rather than after a full listing.
+	dryRun, err := parseDryRun(os.LookupEnv("DRY_RUN"))
+	checkIfError(err)
+
 	client := s3.New(initializeAWSSession())
 	repo := fetchRepo()
 	relevantBranches := fetchRemoteBranches(*repo)
 	relevantCommits := fetchRemoteCommits(*repo, relevantBranches)
-	relevantModels := fetchS3ModelVersions(client, relevantCommits)
 
-	if dryRun() {
+	relevantModels, err := fetchS3ModelVersions(client, relevantCommits)
+	checkIfError(err)
+
+	if dryRun {
+		logger.Log.Info("DRY_RUN is true, no objects will be deleted")
 		prettyPrint(relevantModels)
 	} else {
 		deleteModelVersions(client, relevantModels)
@@ -84,45 +101,68 @@ func deleteModelVersions(client *s3.S3, models map[string]Model) {
 // We'll then make choices on which versions to preserve based on whether:
 // 1. They have been deployed to production and staging
 // 2. They are under active development in a branch
-func fetchS3ModelVersions(client *s3.S3, outstandingCommits []*object.Commit) map[string]Model {
+func fetchS3ModelVersions(client objectLister, outstandingCommits []*object.Commit) (map[string]Model, error) {
 	models := make(map[string]Model)
 	pattern := `^(\d+\.\d+\.\d+)-([a-f0-9]{7})/.*$`
 	bucket := "trade-tariff-models-382373577178"
-
-	resp, err := client.ListObjectsV2(&s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-	})
-	checkIfError(err)
+	objectCount := 0
 
 	re := regexp.MustCompile(pattern)
 
-	for _, obj := range resp.Contents {
-		key := *obj.Key
-		matches := re.FindStringSubmatch(key)
+	// S3 caps a listing at 1000 keys per response. Paging through every page is
+	// what makes the classification below trustworthy: a truncated listing looks
+	// exactly like a complete one, so a deployment marker sitting past the cut
+	// would leave a live model looking undeployed and therefore deletable.
+	err := client.ListObjectsV2Pages(
+		&s3.ListObjectsV2Input{Bucket: aws.String(bucket)},
+		func(page *s3.ListObjectsV2Output, _ bool) bool {
+			for _, obj := range page.Contents {
+				if obj.Key == nil {
+					continue
+				}
+				objectCount++
 
-		if len(matches) == 3 {
-			version := matches[1]
-			commit := matches[2]
-			version_key := version + "-" + commit
+				key := *obj.Key
+				matches := re.FindStringSubmatch(key)
 
-			model, exists := models[version_key]
-			if !exists {
-				model = Model{
-					Version:                version,
-					ShortCommit:            commit,
-					Keys:                   make([]string, 0),
-					Deployed:               false,
-					UnderActiveDevelopment: false,
+				if len(matches) == 3 {
+					version := matches[1]
+					commit := matches[2]
+					version_key := version + "-" + commit
+
+					model, exists := models[version_key]
+					if !exists {
+						model = Model{
+							Version:                version,
+							ShortCommit:            commit,
+							Keys:                   make([]string, 0),
+							Deployed:               false,
+							UnderActiveDevelopment: false,
+						}
+					}
+					model.Keys = append(model.Keys, key)
+
+					if strings.Contains(key, "production") || strings.Contains(key, "staging") {
+						model.Deployed = true
+					}
+					models[version_key] = model
 				}
 			}
-			model.Keys = append(model.Keys, key)
 
-			if strings.Contains(key, "production") || strings.Contains(key, "staging") {
-				model.Deployed = true
-			}
-			models[version_key] = model
-		}
+			// Always continue: stopping early would reintroduce a partial view.
+			return true
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing objects in bucket %s: %w", bucket, err)
 	}
+
+	logger.Log.Info(
+		"Listed bucket objects",
+		logger.String("bucket", bucket),
+		logger.Int("objects", objectCount),
+		logger.Int("modelVersions", len(models)),
+	)
 
 	for _, commit := range outstandingCommits {
 		for key, model := range models {
@@ -141,7 +181,7 @@ func fetchS3ModelVersions(client *s3.S3, outstandingCommits []*object.Commit) ma
 		}
 	}
 
-	return relevant_models
+	return relevant_models, nil
 }
 
 func initializeAWSSession() *session.Session {
@@ -263,14 +303,26 @@ func prettyPrint(v interface{}) {
 	logger.Log.Info(string(b))
 }
 
-func dryRun() bool {
-	var dryRun bool
-
-	if len(os.Getenv("DRY_RUN")) == 0 {
-		dryRun = true
-	} else {
-		dryRun = os.Getenv("DRY_RUN") == "true"
+// parseDryRun demands an explicit "true" or "false".
+//
+// Defaulting an unset DRY_RUN to true used to look identical to a healthy run:
+// the collector reported success every day while collecting nothing. Anything
+// other than the two accepted values used to fall through to false, so a typo
+// such as DRY_RUN=flase silently armed deletion. Both failure modes are now
+// invocation errors, which the deploy already satisfies: the Makefile sets
+// DRY_RUN=true for development and staging and DRY_RUN=false for production,
+// and serverless.yml passes it straight through to the function environment.
+func parseDryRun(value string, present bool) (bool, error) {
+	if !present {
+		return false, errors.New("DRY_RUN is not set, set it to \"true\" or \"false\"")
 	}
 
-	return dryRun
+	switch value {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("DRY_RUN must be \"true\" or \"false\", got %q", value)
+	}
 }
