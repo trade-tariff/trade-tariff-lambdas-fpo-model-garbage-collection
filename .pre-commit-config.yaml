@@ -20,7 +20,7 @@ repos:
     rev: v2.15.0
     hooks:
       - id: golangci-lint-full
-        entry: "bash -c 'cd collector'"
+        entry: "bash -c 'cd collector && golangci-lint run ./...'"
 
   - repo: https://github.com/rhysd/actionlint.git
     rev: v1.7.12

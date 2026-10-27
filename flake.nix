@@ -103,7 +103,7 @@
                     id = "golangci-lint-full";
                     name = "golangci-lint-full";
                     language = "system";
-                    entry = "${reviewTools.bash}/bin/bash -c 'cd collector'";
+                    entry = "${reviewTools.bash}/bin/bash -c 'cd collector && golangci-lint run ./...'";
                     types = [ "go" ];
                     require_serial = true;
                     pass_filenames = false;
