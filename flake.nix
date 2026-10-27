@@ -4,6 +4,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -31,36 +32,8 @@
           type = "github";
           owner = "NixOS";
           repo = "nixpkgs";
-          rev = "4a29d733e8a7d5b824c3d8c958a946a9867b3eb2";
-          narHash = "sha256-f+JACbTqzZ+G92DSnXOUGRhGANb8Blh7CoeYOeBF8/U=";
-        }) { inherit system; };
-        reviewGoPkgs = import (builtins.fetchTree {
-          type = "github";
-          owner = "NixOS";
-          repo = "nixpkgs";
-          rev = "55bfb4d7437bd4e09ab7cba58a43bd68eb310044";
-          narHash = "sha256-jBYGPi4udQ9uo4KQp9m2J0546nJVQitG15gvZSaVVAs=";
-        }) { inherit system; };
-        reviewMarkdownTools = import (builtins.fetchTree {
-          type = "github";
-          owner = "NixOS";
-          repo = "nixpkgs";
-          rev = "2bc1f07311cbe84e9dad955a32e275d43addd243";
-          narHash = "sha256-aJfOPitYdBeun/Ml75utyN8dzM8atq+MZwHrqZ0mOx8=";
-        }) { inherit system; };
-        reviewActionlintTools = import (builtins.fetchTree {
-          type = "github";
-          owner = "NixOS";
-          repo = "nixpkgs";
-          rev = "1d4c88323ac36805d09657d13a5273aea1b34f0c";
-          narHash = "sha256-esRhOS0APE6k40Hs/jjReXg+rx+J5LkWw7cuWFKlwYA=";
-        }) { inherit system; };
-        reviewLintTools = import (builtins.fetchTree {
-          type = "github";
-          owner = "NixOS";
-          repo = "nixpkgs";
-          rev = "e1ebeec86b771e9d387dd02d82ffdc77ac753abc";
-          narHash = "sha256-g/da4FzvckvbiZT075Sb1/YDNDr+tGQgh4N8i5ceYMg=";
+          rev = "d3b13ad75cc492690728f9307e443dec9ef9a20e";
+          narHash = "sha256-pGPnZGi8y9d76xNeracniXO3dsYVROEmMkMc8jD0Ihc=";
         }) { inherit system; };
         reviewTrufflehogScan = pkgs.writeShellScript "trufflehog-pre-commit" ''
           set -euo pipefail
@@ -75,7 +48,7 @@
               *) printf '(^|/)%s$\n' "$escaped" >> "$exclude_file" ;;
             esac
           done < <(git ls-files --others --ignored --exclude-standard --directory)
-          exec ${reviewGoPkgs.trufflehog}/bin/trufflehog filesystem "$(pwd -P)" --exclude-paths="$exclude_file" --results=verified,unknown --fail
+          exec ${reviewTools.trufflehog}/bin/trufflehog filesystem "$(pwd -P)" --exclude-paths="$exclude_file" --results=verified,unknown --fail
         '';
         reviewPreCommitConfig = pkgs.writeText "review-pre-commit.json" (
           builtins.toJSON {
@@ -118,7 +91,7 @@
                     id = "markdownlint-docker";
                     name = "markdownlint-docker";
                     language = "system";
-                    entry = "${reviewMarkdownTools.markdownlint-cli}/bin/markdownlint";
+                    entry = "${reviewTools.markdownlint-cli}/bin/markdownlint";
                     types = [ "markdown" ];
                     args = [
                       "--ignore"
@@ -130,7 +103,7 @@
                     id = "golangci-lint-full";
                     name = "golangci-lint-full";
                     language = "system";
-                    entry = "${reviewTools.bash}/bin/bash -c 'cd collector'";
+                    entry = "${reviewTools.bash}/bin/bash -c 'cd collector && golangci-lint run ./...'";
                     types = [ "go" ];
                     require_serial = true;
                     pass_filenames = false;
@@ -139,7 +112,7 @@
                     id = "actionlint-docker";
                     name = "Lint GitHub Actions workflow files";
                     language = "system";
-                    entry = "${reviewActionlintTools.actionlint}/bin/actionlint";
+                    entry = "${reviewTools.actionlint}/bin/actionlint";
                     types = [ "yaml" ];
                     files = "^\\.github/workflows/";
                   }
@@ -209,8 +182,7 @@
               excludes = [ "^terraform/" ];
               stages = [ "pre-commit" ];
             };
-            nixfmt-rfc-style = {
-              package = pre-commit-hooks.inputs.nixpkgs.legacyPackages.${system}.nixfmt;
+            nixfmt = {
               enable = true;
               stages = [ "pre-commit" ];
             };
@@ -244,8 +216,8 @@
         devShells.review = pkgs.mkShell {
           shellHook = "";
           nativeBuildInputs = [
-            reviewGoPkgs.go
-            reviewLintTools.golangci-lint
+            reviewTools.go_1_27
+            reviewTools.golangci-lint
             pkgs.gitMinimal
             pkgs.bash
             pkgs.coreutils
@@ -310,11 +282,11 @@
             preCommitCheck.enabledPackages
             ++ (with pkgs; [
               circleci-cli
-              go
+              go_1_27
               golangci-lint
               gopls
               lint
-              serverless
+              nodejs
               update-modules
             ]);
         };
